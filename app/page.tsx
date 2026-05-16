@@ -51,6 +51,7 @@ export default function Home() {
         className="flex h-full"
         value={contentType}
         onValueChange={(v) => setContentType(v as ContentType)}
+        orientation="vertical"
       >
         <SidebarSwitcher
           contentType={contentType}

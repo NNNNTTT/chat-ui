@@ -46,7 +46,7 @@ interface SidebarSwitcherProps {
 
 export function SidebarSwitcher({ contentType, onContentTypeChange }: SidebarSwitcherProps) {
   return (
-    <div className="flex flex-col justify-between border-r border-gray-200 bg-gray-50 py-3 w-12 shrink-0">
+    <div className="flex flex-col items-center border-r border-gray-200 bg-gray-50 py-3 w-12 shrink-0">
       <TabsList className="flex flex-col h-auto gap-1 bg-transparent px-1">
         {ITEMS.map((item) => (
           <Tooltip key={item.type}>
