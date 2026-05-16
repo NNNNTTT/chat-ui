@@ -6,6 +6,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Tabs } from "@/components/ui/tabs"
 import {
   Tooltip,
@@ -39,6 +46,7 @@ const SAMPLE_MESSAGES = [
 
 export default function Home() {
   const [input, setInput] = useState("")
+  const [model, setModel] = useState("gpt-4o")
   const [contentType, setContentType] = useState<ContentType>("chats")
   const [showSidebar, setShowSidebar] = useState(true)
 
@@ -87,8 +95,8 @@ export default function Home() {
           <h1 className="text-sm font-medium text-gray-900">
             Reactのhooksについて
           </h1>
-          <Badge variant="outline" className="text-[10px] tracking-widest text-gray-400 bg-transparent">
-            GPT-4o
+          <Badge variant="outline" className="text-[10px] tracking-widest text-gray-400 bg-transparent uppercase">
+            {model}
           </Badge>
         </header>
 
@@ -171,9 +179,24 @@ export default function Home() {
                 </TooltipContent>
               </Tooltip>
             </div>
-            <p className="text-center text-[10px] text-gray-400 mt-2 tracking-wide">
-              Shift+Enter で改行
-            </p>
+            <div className="flex items-center justify-between mt-2">
+              <Select value={model} onValueChange={setModel}>
+                <SelectTrigger className="w-auto h-6 gap-1.5 border-0 bg-transparent px-1.5 text-[11px] text-gray-400 hover:text-gray-600 shadow-none focus:ring-0 cursor-pointer">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                  <SelectItem value="gpt-4o-mini">GPT-4o mini</SelectItem>
+                  <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                  <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
+                  <SelectItem value="o1">o1</SelectItem>
+                  <SelectItem value="o1-mini">o1-mini</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-gray-400 tracking-wide">
+                Shift+Enter で改行
+              </p>
+            </div>
           </div>
         </div>
       </main>

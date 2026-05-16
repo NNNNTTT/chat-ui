@@ -1,8 +1,10 @@
 "use client"
 
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { TabsContent } from "@/components/ui/tabs"
+import { Plus } from "lucide-react"
 import { useState } from "react"
 import { ContentType } from "./sidebar-switcher"
 
@@ -44,6 +46,13 @@ export function Sidebar({ showSidebar }: SidebarProps) {
     return (
       <TabsContent value={contentType} className="m-0 h-full">
         <div className="flex h-full flex-col p-3 gap-2">
+          <Button
+            variant="outline"
+            className="w-full justify-start gap-2 text-xs h-8"
+          >
+            <Plus className="size-4" />
+            新しいチャット
+          </Button>
           <p className="text-xs font-semibold text-gray-500 px-1">
             {LABELS[contentType]}
           </p>
