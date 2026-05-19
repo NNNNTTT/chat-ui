@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useContext, useState, useCallback, useEffect } from "react"
+import { LLMID, Message } from "@/types"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -21,6 +22,8 @@ import {
 } from "@/components/ui/tooltip"
 import { Sidebar } from "@/components/sidebar/sidebar"
 import { SidebarSwitcher, ContentType } from "@/components/sidebar/sidebar-switcher"
+import {  LLM_LIST } from "@/lib/models/llm/llm-list"
+import { ChatUIContext } from "@/context/context"
 
 const SAMPLE_MESSAGES = [
   {
@@ -46,11 +49,82 @@ const SAMPLE_MESSAGES = [
 
 export default function Home() {
   const [input, setInput] = useState("")
-  const [model, setModel] = useState("gpt-4o")
   const [contentType, setContentType] = useState<ContentType>("chats")
   const [showSidebar, setShowSidebar] = useState(true)
 
   const handleToggleSidebar = () => setShowSidebar((prev) => !prev)
+
+  // チャットコンテキスト
+  const {
+    chatSettings,
+    setChatSettings,
+    messages,
+    setMessages,
+    isLoading,
+    setIsLoading,
+    responseId,
+    setResponseId
+  } = useContext(ChatUIContext)
+
+  const handleModelChange = useCallback((value: string) => {
+    setChatSettings((prev) => ({ ...prev, model: value as LLMID }))
+  }, [setChatSettings])
+
+  // メッセージ送信
+  // const handleSend = async () => {                                                                                                                                                                                         
+  //   const res = await fetch("/api/chat", {                                                                                                                                                                                 
+  //     method: "POST",                                                                                                                                                                                                      
+  //     headers: { "Content-Type": "application/json" },                                                                                                                                                                     
+  //     body: JSON.stringify({                                                                                                                                                                                             
+  //       message: input,
+  //       model: chatSettings?.model,
+  //     }),
+  //   })
+  //   const data = await res.json()
+  //   console.log(data) // APIからの応答
+  // }
+
+  const handleSend = async () => {
+    if (!input.trim()) return
+
+    // 現在時刻を取得
+    const time = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+
+    // ユーザーメッセージを追加
+    const userMessage: Message = {
+      id: Date.now(),
+      role: "user",
+      content: input,
+      time,
+    }
+    setMessages((prev) => [...prev, userMessage])
+    setInput("")
+    setIsLoading(true)
+
+    // API呼び出し
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: input,
+        model: chatSettings?.model,
+        previousResponseId: responseId,
+      }),
+    })
+    const data = await res.json()
+    console.log(data)
+
+    // AIメッセージを追加
+    const assistantMessage: Message = {
+      id: Date.now() + 1,
+      role: "assistant",
+      content: data.output.find((o: any) => o.type === "message").content[0].text,
+      time: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
+    }
+    setMessages((prev) => [...prev, assistantMessage])
+    setResponseId(data.id)
+    setIsLoading(false)
+  }
 
   return (
     <div className="flex h-screen bg-white text-gray-900 overflow-hidden">
@@ -96,14 +170,14 @@ export default function Home() {
             Reactのhooksについて
           </h1>
           <Badge variant="outline" className="text-[10px] tracking-widest text-gray-400 bg-transparent uppercase">
-            {model}
+            {chatSettings?.model ?? "gpt-4o"}
           </Badge>
         </header>
 
         {/* Messages */}
         <ScrollArea className="flex-1 bg-gray-50/50">
           <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
-            {SAMPLE_MESSAGES.map((msg) => (
+            {messages.map((msg) => (
               <div
                 key={msg.id}
                 className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
@@ -136,6 +210,7 @@ export default function Home() {
             ))}
 
             {/* Typing Indicator */}
+            {isLoading && (
             <div className="flex gap-3">
               <Avatar className="w-7 h-7 shrink-0">
                 <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-indigo-500 text-[10px] font-bold text-white">
@@ -148,6 +223,7 @@ export default function Home() {
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:300ms]" />
               </div>
             </div>
+            )}
           </div>
         </ScrollArea>
 
@@ -168,6 +244,7 @@ export default function Home() {
                     size="icon"
                     disabled={!input.trim()}
                     className="shrink-0 size-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-100 disabled:text-gray-400 text-white transition-all duration-150"
+                    onClick={ handleSend }
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
                       <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
@@ -180,17 +257,16 @@ export default function Home() {
               </Tooltip>
             </div>
             <div className="flex items-center justify-between mt-2">
-              <Select value={model} onValueChange={setModel}>
+              <Select value={chatSettings?.model ?? "gpt-4o"} onValueChange={handleModelChange}>
                 <SelectTrigger className="w-auto h-6 gap-1.5 border-0 bg-transparent px-1.5 text-[11px] text-gray-400 hover:text-gray-600 shadow-none focus:ring-0 cursor-pointer">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-                  <SelectItem value="gpt-4o-mini">GPT-4o mini</SelectItem>
-                  <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
-                  <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                  <SelectItem value="o1">o1</SelectItem>
-                  <SelectItem value="o1-mini">o1-mini</SelectItem>
+                  {LLM_LIST.map((llm) => (
+                      <SelectItem key={llm.modelId} value={llm.modelId}>                                                                                                                                                                     
+                        {llm.modelName}                                                                                                                                                                                                      
+                      </SelectItem>  
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-[10px] text-gray-400 tracking-wide">
