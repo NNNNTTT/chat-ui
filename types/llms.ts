@@ -7,6 +7,8 @@ export type OpenAILLMID =
   | "gpt-5.5-pro" // GPT-5.5 pro
   | "gpt-5.4-mini" // GPT-5.5 mini
   | "gpt-5.4" // GPT-5.4
+  | "gpt-image-1" // GPT Image 1
+  | "gpt-image-2" // GPT Image 2
 
 export interface LLM {
     modelId: OpenAILLMID

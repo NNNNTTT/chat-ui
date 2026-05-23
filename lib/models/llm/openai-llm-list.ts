@@ -62,9 +62,31 @@ const GPT5_4: LLM = {
   }
 }
 
+// GPT Image 1
+const GPT_IMAGE_1: LLM = {
+  modelId: "gpt-image-1",
+  modelName: "GPT Image 1",
+  hostedId: "gpt-image-1",
+  platformLink: OPENAI_PLATORM_LINK,
+  imageInput: false,
+  imageOutput: true,
+}
+
+// GPT Image 2
+const GPT_IMAGE_2: LLM = {
+  modelId: "gpt-image-2",
+  modelName: "GPT Image 2",
+  hostedId: "gpt-image-2",
+  platformLink: OPENAI_PLATORM_LINK,
+  imageInput: false,
+  imageOutput: true,
+}
+
 export const OPENAI_LLM_LIST: LLM[] = [
   GPT5_5,
   GPT5_5_PRO,
   GPT5_4_MINI,
   GPT5_4,
+  GPT_IMAGE_1,
+  GPT_IMAGE_2
 ]
