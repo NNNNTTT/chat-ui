@@ -1,38 +1,29 @@
 "use client"
 
-import { useContext, useState, useCallback, useEffect, useRef } from "react"
+import { useCallback, useContext, useEffect, useState } from "react"
 import { LLMID, Message } from "@/types"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Tabs } from "@/components/ui/tabs"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { Sidebar } from "@/components/sidebar/sidebar"
-import { SidebarSwitcher, ContentType } from "@/components/sidebar/sidebar-switcher"
-import {  LLM_LIST } from "@/lib/models/llm/llm-list"
 import { ChatUIContext } from "@/context/context"
+import { LLM_LIST } from "@/lib/models/llm/llm-list"
+import { Sidebar, ChatItem } from "@/components/sidebar/sidebar"
+import { ChatHeader } from "@/components/chat/chat-header"
+import { ChatMessages } from "@/components/chat/chat-messages"
+import { Composer } from "@/components/chat/composer"
+
+const CURRENT_USER = {
+  name: "田中 玲奈",
+  initials: "T",
+}
+
+const INITIAL_CHATS: ChatItem[] = [
+  { id: "c1", title: "新しいチャット", bucket: "today", updatedAt: "たった今" },
+]
+
+const nowTime = () =>
+  new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+
+const uid = () => "c-" + Math.random().toString(36).slice(2, 9)
 
 export default function HomeClient() {
-  const [input, setInput] = useState("")
-  const [contentType, setContentType] = useState<ContentType>("chats")
-  const [showSidebar, setShowSidebar] = useState(true)
-
-  const handleToggleSidebar = () => setShowSidebar((prev) => !prev)
-
-  // チャットコンテキスト
   const {
     chatSettings,
     setChatSettings,
@@ -41,243 +32,214 @@ export default function HomeClient() {
     isLoading,
     setIsLoading,
     responseId,
-    setResponseId
+    setResponseId,
   } = useContext(ChatUIContext)
 
-  const handleModelChange = useCallback((value: string) => {
-    setChatSettings((prev) => ({ ...prev, model: value as LLMID }))
-  }, [setChatSettings])
+  const [chats, setChats] = useState<ChatItem[]>(INITIAL_CHATS)
+  const [currentChatId, setCurrentChatId] = useState(INITIAL_CHATS[0].id)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [theme, setTheme] = useState<"light" | "dark">("light")
+  const [input, setInput] = useState("")
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    console.log(messagesEndRef)
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages, isLoading])
+    document.documentElement.classList.toggle("dark", theme === "dark")
+  }, [theme])
 
-  const handleSend = async () => {
-    if (!input.trim()) return
+  // First user message becomes the chat title
+  useEffect(() => {
+    const first = messages.find((m) => m.role === "user")
+    if (!first) return
+    setChats((prev) =>
+      prev.map((c) =>
+        c.id === currentChatId
+          ? {
+              ...c,
+              title:
+                first.content.length > 28
+                  ? first.content.slice(0, 26) + "…"
+                  : first.content || c.title,
+              updatedAt: "たった今",
+            }
+          : c,
+      ),
+    )
+  }, [messages, currentChatId])
 
-    // 現在時刻を取得
-    const time = new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+  const handleSend = useCallback(async () => {
+    const text = input.trim()
+    if (!text || isLoading) return
 
-    // ユーザーメッセージを追加
     const userMessage: Message = {
       id: Date.now(),
       role: "user",
-      content: input,
-      time,
+      content: text,
+      time: nowTime(),
     }
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
 
-    const isImageModel = LLM_LIST.find((m) => m.modelId === chatSettings?.model)?.imageOutput === true
+    const selectedModel = LLM_LIST.find((m) => m.modelId === chatSettings?.model)
+    const isImageModel = selectedModel?.imageOutput === true
 
-    if (isImageModel) {
-      // 画像生成API呼び出し
-      const res = await fetch("/api/image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: input, model: chatSettings?.model }),
-      })
-      const data = await res.json()
-
-      const assistantMessage: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: data.error ?? "",
-        imageUrl: data.imageUrl,
-        time: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
+    try {
+      if (isImageModel) {
+        const res = await fetch("/api/image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: text, model: chatSettings?.model }),
+        })
+        const data = await res.json()
+        const assistantMessage: Message = {
+          id: Date.now() + 1,
+          role: "assistant",
+          content: data.error ?? "",
+          imageUrl: data.imageUrl,
+          time: nowTime(),
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        const currentMessages = [...messages, userMessage]
+        const hasImage = currentMessages.some((m) => m.imageUrl)
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            model: chatSettings?.model,
+            ...(hasImage
+              ? { messages: currentMessages }
+              : { previousResponseId: responseId }),
+          }),
+        })
+        const data = await res.json()
+        const replyText = data.output
+          ?.find((o: { type: string }) => o.type === "message")
+          ?.content?.[0]?.text ?? ""
+        const assistantMessage: Message = {
+          id: Date.now() + 1,
+          role: "assistant",
+          content: replyText,
+          time: nowTime(),
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+        if (data.id) setResponseId(data.id)
       }
-      setMessages((prev) => [...prev, assistantMessage])
-    } else {
-      // テキストAPI呼び出し
-      const currentMessages = [...messages, userMessage]
-      const hasImage = currentMessages.some((m) => m.imageUrl)
-
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: input,
-          model: chatSettings?.model,
-          ...(hasImage
-            ? { messages: currentMessages }
-            : { previousResponseId: responseId }),
-        }),
-      })
-      const data = await res.json()
-
-      const assistantMessage: Message = {
-        id: Date.now() + 1,
-        role: "assistant",
-        content: data.output.find((o: any) => o.type === "message").content[0].text,
-        time: new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }),
-      }
-      setMessages((prev) => [...prev, assistantMessage])
-      setResponseId(data.id)
+    } finally {
+      setIsLoading(false)
     }
+  }, [input, isLoading, chatSettings, messages, responseId, setMessages, setIsLoading, setResponseId])
 
-    setIsLoading(false)
-  }
+  const handleNewChat = useCallback(() => {
+    const id = uid()
+    setChats((prev) => [
+      { id, title: "新しいチャット", bucket: "today", updatedAt: "たった今" },
+      ...prev,
+    ])
+    setCurrentChatId(id)
+    setMessages([])
+    setResponseId(null)
+    setInput("")
+  }, [setMessages, setResponseId])
+
+  const handleDeleteChat = useCallback(
+    (id: string) => {
+      const filtered = chats.filter((c) => c.id !== id)
+      if (id === currentChatId) {
+        if (filtered.length === 0) {
+          const newId = uid()
+          setChats([
+            { id: newId, title: "新しいチャット", bucket: "today", updatedAt: "たった今" },
+          ])
+          setCurrentChatId(newId)
+        } else {
+          setChats(filtered)
+          setCurrentChatId(filtered[0].id)
+        }
+        setMessages([])
+        setResponseId(null)
+      } else {
+        setChats(filtered)
+      }
+    },
+    [chats, currentChatId, setMessages, setResponseId],
+  )
+
+  const handleSelectChat = useCallback(
+    (id: string) => {
+      if (id === currentChatId) return
+      setCurrentChatId(id)
+      // Single-context architecture: switching chats clears the active thread.
+      setMessages([])
+      setResponseId(null)
+    },
+    [currentChatId, setMessages, setResponseId],
+  )
+
+  const handleTogglePin = useCallback((id: string) => {
+    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c)))
+  }, [])
+
+  const handleChangeModel = useCallback(
+    (id: LLMID) => {
+      setChatSettings((prev) => ({ ...prev, model: id }))
+    },
+    [setChatSettings],
+  )
+
+  const currentChat = chats.find((c) => c.id === currentChatId) ?? chats[0]
 
   return (
-    <div className="flex h-screen bg-white text-gray-900 overflow-hidden">
-      {/* Sidebar + Switcher */}
-      <Tabs
-        className="flex h-full"
-        value={contentType}
-        onValueChange={(v) => setContentType(v as ContentType)}
-        orientation="vertical"
+    <div
+      className="grid h-screen w-full overflow-hidden"
+      style={{
+        gridTemplateColumns: sidebarOpen ? "260px 1fr" : "0 1fr",
+        background: "var(--notion-bg)",
+        color: "var(--notion-text)",
+        transition: "grid-template-columns .22s cubic-bezier(.2,.7,.3,1)",
+      }}
+    >
+      <div
+        className="overflow-hidden h-full"
+        style={{
+          transition: "margin-left .22s cubic-bezier(.2,.7,.3,1)",
+          marginLeft: sidebarOpen ? 0 : -260,
+        }}
       >
-        <SidebarSwitcher
-          contentType={contentType}
-          onContentTypeChange={setContentType}
+        <Sidebar
+          chats={chats}
+          currentChatId={currentChatId}
+          onSelectChat={handleSelectChat}
+          onNewChat={handleNewChat}
+          onDeleteChat={handleDeleteChat}
+          onTogglePin={handleTogglePin}
+          onSearch={() => {}}
+          onCloseSidebar={() => setSidebarOpen(false)}
+          user={CURRENT_USER}
         />
-        <Sidebar showSidebar={showSidebar} />
-      </Tabs>
+      </div>
 
-      {/* Main */}
-      <main className="flex-1 flex flex-col min-w-0 relative">
-        {/* Toggle Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleToggleSidebar}
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 size-6 text-gray-400 hover:text-gray-700"
-              style={{ transform: `translateY(-50%) rotate(${showSidebar ? 180 : 0}deg)` }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="size-4">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-              </svg>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right">
-            <p>{showSidebar ? "サイドバーを閉じる" : "サイドバーを開く"}</p>
-          </TooltipContent>
-        </Tooltip>
-
-        {/* Header */}
-        <header className="flex items-center justify-between px-10 py-4 border-b border-gray-200 shrink-0 bg-white">
-          <h1 className="text-sm font-medium text-gray-900">
-            Reactのhooksについて
-          </h1>
-          <Badge variant="outline" className="text-[10px] tracking-widest text-gray-400 bg-transparent uppercase">
-            {chatSettings?.model ?? "gpt-4o"}
-          </Badge>
-        </header>
-
-        {/* Messages */}
-        <ScrollArea className="flex-1 overflow-hidden bg-gray-50/50">
-          <div className="max-w-2xl mx-auto px-6 py-8 space-y-8">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""}`}
-              >
-                <Avatar className="w-7 h-7 shrink-0 mt-0.5">
-                  <AvatarFallback
-                    className={`text-[10px] font-bold text-white ${
-                      msg.role === "assistant"
-                        ? "bg-gradient-to-br from-cyan-500 to-indigo-500"
-                        : "bg-gradient-to-br from-indigo-500 to-purple-600"
-                    }`}
-                  >
-                    {msg.role === "assistant" ? "AI" : "T"}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className={`flex flex-col gap-1 max-w-[80%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
-                  <div
-                    className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
-                      msg.role === "user"
-                        ? "bg-indigo-600 text-white rounded-tr-sm"
-                        : "bg-white border border-gray-200 text-gray-700 rounded-tl-sm shadow-sm"
-                    }`}
-                  >
-                    {msg.imageUrl && (
-                      <img
-                        src={msg.imageUrl}
-                        alt="生成された画像"
-                        className="rounded-xl max-w-full"
-                      />
-                    )}
-                    {msg.content && <span>{msg.content}</span>}
-                  </div>
-                  <span className="text-[10px] text-gray-400 px-1">{msg.time}</span>
-                </div>
-              </div>
-            ))}
-
-            {/* Typing Indicator */}
-            {isLoading && (
-            <div className="flex gap-3">
-              <Avatar className="w-7 h-7 shrink-0">
-                <AvatarFallback className="bg-gradient-to-br from-cyan-500 to-indigo-500 text-[10px] font-bold text-white">
-                  AI
-                </AvatarFallback>
-              </Avatar>
-              <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5 shadow-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:0ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:150ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce [animation-delay:300ms]" />
-              </div>
-            </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
-
-        {/* Input Area */}
-        <div className="shrink-0 border-t border-gray-200 px-6 py-4 bg-white">
-          <div className="max-w-2xl mx-auto">
-            <div className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-indigo-400 focus-within:ring-3 focus-within:ring-indigo-100 transition-all duration-200">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="メッセージを入力..."
-                rows={1}
-                className="flex-1 bg-transparent border-0 text-sm text-gray-900 placeholder:text-gray-400 resize-none outline-none shadow-none focus-visible:ring-0 p-0 leading-relaxed max-h-40"
-              />
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    disabled={!input.trim()}
-                    className="shrink-0 size-8 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-100 disabled:text-gray-400 text-white transition-all duration-150"
-                    onClick={ handleSend }
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="size-3.5">
-                      <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                    </svg>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>送信</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <Select value={chatSettings?.model ?? "gpt-4o"} onValueChange={handleModelChange}>
-                <SelectTrigger className="w-auto h-6 gap-1.5 border-0 bg-transparent px-1.5 text-[11px] text-gray-400 hover:text-gray-600 shadow-none focus:ring-0 cursor-pointer">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {LLM_LIST.map((llm) => (
-                      <SelectItem key={llm.modelId} value={llm.modelId}>
-                        {llm.modelName}
-                      </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[10px] text-gray-400 tracking-wide">
-                Shift+Enter で改行
-              </p>
-            </div>
-          </div>
-        </div>
+      <main
+        className="flex flex-col h-full min-w-0"
+        style={{ background: "var(--notion-bg)" }}
+      >
+        <ChatHeader
+          title={currentChat?.title ?? ""}
+          sidebarOpen={sidebarOpen}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          models={LLM_LIST}
+          selectedModelId={chatSettings?.model}
+          onChangeModel={handleChangeModel}
+          theme={theme}
+          onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+        />
+        <ChatMessages messages={messages} isLoading={isLoading} />
+        <Composer
+          value={input}
+          onChange={setInput}
+          onSend={handleSend}
+          isLoading={isLoading}
+        />
       </main>
     </div>
   )
