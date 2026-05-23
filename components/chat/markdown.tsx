@@ -48,11 +48,12 @@ function renderBlock(text: string, key: number): ReactNode {
         }
         return (
           <p key={i}>
-            {lines.flatMap((l, j) =>
-              j === 0
-                ? renderInline(l)
-                : [<br key={`br${j}`} />, ...renderInline(l)],
-            )}
+            {lines.map((l, j) => (
+              <Fragment key={j}>
+                {j > 0 && <br />}
+                {renderInline(l)}
+              </Fragment>
+            ))}
           </p>
         )
       })}

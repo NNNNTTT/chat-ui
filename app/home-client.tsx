@@ -191,19 +191,18 @@ export default function HomeClient() {
 
   return (
     <div
-      className="grid h-screen w-full overflow-hidden"
+      className="flex h-screen w-full overflow-hidden"
       style={{
-        gridTemplateColumns: sidebarOpen ? "260px 1fr" : "0 1fr",
         background: "var(--notion-bg)",
         color: "var(--notion-text)",
-        transition: "grid-template-columns .22s cubic-bezier(.2,.7,.3,1)",
       }}
     >
       <div
-        className="overflow-hidden h-full"
+        className="overflow-hidden h-full shrink-0"
         style={{
-          transition: "margin-left .22s cubic-bezier(.2,.7,.3,1)",
+          width: 260,
           marginLeft: sidebarOpen ? 0 : -260,
+          transition: "margin-left .22s cubic-bezier(.2,.7,.3,1)",
         }}
       >
         <Sidebar
@@ -220,7 +219,7 @@ export default function HomeClient() {
       </div>
 
       <main
-        className="flex flex-col h-full min-w-0"
+        className="flex-1 flex flex-col min-w-0"
         style={{ background: "var(--notion-bg)" }}
       >
         <ChatHeader
