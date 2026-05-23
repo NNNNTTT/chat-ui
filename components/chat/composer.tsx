@@ -21,7 +21,7 @@ export function Composer({ value, onChange, onSend, isLoading }: ComposerProps) 
   }, [value])
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && e.shiftKey) {
       e.preventDefault()
       onSend()
     }
@@ -44,7 +44,7 @@ export function Composer({ value, onChange, onSend, isLoading }: ComposerProps) 
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={onKey}
-          placeholder="メッセージを送信…  (Shift+Enter で改行)"
+          placeholder="メッセージを送信…  (Shift+Enter で送信、Enter で改行)"
           rows={1}
           className="w-full min-h-[22px] max-h-[200px] text-[15px] leading-[1.5] resize-none bg-transparent outline-none placeholder:text-[var(--notion-text-3)]"
           style={{ color: "var(--notion-text)" }}
@@ -57,7 +57,7 @@ export function Composer({ value, onChange, onSend, isLoading }: ComposerProps) 
           <span className="text-[11px] px-1" style={{ color: "var(--notion-text-3)" }}>
             {isLoading
               ? "応答を生成中…"
-              : `${value.length} 文字 · Enter で送信`}
+              : `${value.length} 文字 · Shift+Enter で送信`}
           </span>
           <button
             onClick={onSend}
