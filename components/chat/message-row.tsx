@@ -2,8 +2,49 @@ import { Message } from "@/types"
 import { Icon } from "@/components/ui/icon"
 import { Markdown } from "@/components/chat/markdown"
 
+function extensionFromDataUrl(url: string): string {
+  const match = /^data:image\/([a-zA-Z0-9+.-]+)/.exec(url)
+  if (!match) return "png"
+  const subtype = match[1].toLowerCase()
+  if (subtype === "jpeg") return "jpg"
+  if (subtype === "svg+xml") return "svg"
+  return subtype
+}
+
+function DownloadableImage({
+  src,
+  filename,
+  className = "",
+}: {
+  src: string
+  filename: string
+  className?: string
+}) {
+  return (
+    <div className={`relative group inline-block ${className}`}>
+      <img
+        src={src}
+        alt="生成された画像"
+        className="rounded-lg max-w-full block"
+      />
+      <a
+        href={src}
+        download={filename}
+        title="画像をダウンロード"
+        className="absolute top-2 right-2 w-8 h-8 grid place-items-center rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity backdrop-blur-sm"
+        style={{ background: "rgba(0, 0, 0, 0.55)", color: "#fff" }}
+      >
+        <Icon name="download" size={16} />
+      </a>
+    </div>
+  )
+}
+
 export function MessageRow({ msg }: { msg: Message }) {
   const isUser = msg.role === "user"
+  const filename = msg.imageUrl
+    ? `generated-${msg.id}.${extensionFromDataUrl(msg.imageUrl)}`
+    : ""
   return (
     <div className={`flex flex-col gap-1.5 ${isUser ? "items-end" : "items-stretch"}`}>
       <div
@@ -35,11 +76,7 @@ export function MessageRow({ msg }: { msg: Message }) {
           }}
         >
           {msg.imageUrl && (
-            <img
-              src={msg.imageUrl}
-              alt="生成された画像"
-              className="rounded-lg max-w-full mb-1"
-            />
+            <DownloadableImage src={msg.imageUrl} filename={filename} className="mb-1" />
           )}
           {msg.content}
         </div>
@@ -49,11 +86,7 @@ export function MessageRow({ msg }: { msg: Message }) {
           style={{ color: "var(--notion-text)" }}
         >
           {msg.imageUrl && (
-            <img
-              src={msg.imageUrl}
-              alt="生成された画像"
-              className="rounded-lg max-w-full mb-3"
-            />
+            <DownloadableImage src={msg.imageUrl} filename={filename} className="mb-3" />
           )}
           <Markdown source={msg.content} />
         </div>
