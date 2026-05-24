@@ -8,7 +8,8 @@ function deriveTitle(text: string): string {
 }
 
 export async function POST(req: Request) {
-  const { chatId, text, model } = await req.json()
+  const { chatId, text, model, systemPrompt, temperature, maxOutputTokens } =
+    await req.json()
 
   if (typeof chatId !== "string" || typeof text !== "string") {
     return NextResponse.json(
@@ -37,18 +38,29 @@ export async function POST(req: Request) {
 
   const input = hasImage
     ? allMessages.map((m) => {
-        if (m.imageUrl) {
+        // User が添付した画像は input_image として再送
+        if (m.role === "user" && m.imageUrl) {
           return {
-            role: m.role,
+            role: "user",
             content: [
               { type: "input_image", image_url: m.imageUrl },
               ...(m.content ? [{ type: "input_text", text: m.content }] : []),
             ],
           }
         }
+        // Assistant が生成した画像は API 入力として再送できないのでテキスト化
+        if (m.role === "assistant" && m.imageUrl) {
+          return {
+            role: "assistant",
+            content: m.content || "[画像を生成しました]",
+          }
+        }
         return { role: m.role, content: m.content }
       })
     : text
+
+  const trimmedSystemPrompt =
+    typeof systemPrompt === "string" ? systemPrompt.trim() : ""
 
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
@@ -61,6 +73,11 @@ export async function POST(req: Request) {
       input,
       ...(!hasImage && chat.responseId
         ? { previous_response_id: chat.responseId }
+        : {}),
+      ...(trimmedSystemPrompt ? { instructions: trimmedSystemPrompt } : {}),
+      ...(typeof temperature === "number" ? { temperature } : {}),
+      ...(typeof maxOutputTokens === "number" && maxOutputTokens > 0
+        ? { max_output_tokens: maxOutputTokens }
         : {}),
     }),
   })

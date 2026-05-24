@@ -28,6 +28,7 @@ interface SidebarProps {
   onDeleteChat: (id: string) => void
   onTogglePin: (id: string) => void
   onSearch: () => void
+  onOpenSettings: () => void
   onCloseSidebar: () => void
   user: { name: string; initials: string }
 }
@@ -40,6 +41,7 @@ export function Sidebar({
   onDeleteChat,
   onTogglePin,
   onSearch,
+  onOpenSettings,
   onCloseSidebar,
   user,
 }: SidebarProps) {
@@ -91,7 +93,7 @@ export function Sidebar({
       <div className="flex flex-col gap-px px-2 pb-1.5">
         <SidebarAction icon="search" label="検索" kbd="⌘K" onClick={onSearch} />
         <SidebarAction icon="pencil" label="新しいチャット" kbd="⌘N" onClick={onNewChat} />
-        <SidebarAction icon="settings" label="設定" />
+        <SidebarAction icon="settings" label="設定" onClick={onOpenSettings} />
       </div>
 
       {/* History */}
@@ -134,6 +136,7 @@ export function Sidebar({
       {/* User footer */}
       <div className="p-2">
         <button
+          onClick={onOpenSettings}
           className="flex items-center gap-2 w-full px-1.5 py-1 rounded hover:bg-[var(--notion-hover)]"
         >
           <span

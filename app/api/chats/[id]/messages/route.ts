@@ -18,6 +18,7 @@ export async function GET(
   }
   return NextResponse.json({
     responseId: chat.responseId,
+    model: chat.model,
     messages: chat.messages.map(serializeMessage),
   })
 }

@@ -1,13 +1,14 @@
 "use client"
 
 import { useCallback, useContext, useEffect, useState } from "react"
-import { LLMID, Message } from "@/types"
+import { LLMID, Message, ChatSettings } from "@/types"
 import { ChatUIContext } from "@/context/context"
 import { LLM_LIST } from "@/lib/models/llm/llm-list"
 import { Sidebar, ChatItem } from "@/components/sidebar/sidebar"
 import { ChatHeader } from "@/components/chat/chat-header"
 import { ChatMessages } from "@/components/chat/chat-messages"
 import { Composer } from "@/components/chat/composer"
+import { SettingsPanel } from "@/components/settings/settings-panel"
 
 const CURRENT_USER = {
   name: "坪田 直樹",
@@ -16,6 +17,8 @@ const CURRENT_USER = {
 
 const nowTime = () =>
   new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+
+type SidebarView = "chats" | "settings"
 
 export default function HomeClient() {
   const {
@@ -32,6 +35,7 @@ export default function HomeClient() {
   const [chats, setChats] = useState<ChatItem[]>([])
   const [currentChatId, setCurrentChatId] = useState<string>("")
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarView, setSidebarView] = useState<SidebarView>("chats")
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [input, setInput] = useState("")
 
@@ -47,9 +51,11 @@ export default function HomeClient() {
       if (cancelled) return
       let initialChats = list
       if (initialChats.length === 0) {
-        const created = await fetch("/api/chats", { method: "POST" }).then((r) =>
-          r.json(),
-        )
+        const created = await fetch("/api/chats", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: chatSettings?.defaultModel }),
+        }).then((r) => r.json())
         initialChats = [created]
       }
       if (cancelled) return
@@ -62,6 +68,10 @@ export default function HomeClient() {
       if (cancelled) return
       setMessages(data.messages ?? [])
       setResponseId(data.responseId ?? null)
+      // Restore chat's model into the header picker (B-plan)
+      if (data.model) {
+        setChatSettings((prev) => ({ ...prev, model: data.model as LLMID }))
+      }
     })()
     return () => {
       cancelled = true
@@ -89,8 +99,20 @@ export default function HomeClient() {
     try {
       const endpoint = isImageModel ? "/api/image" : "/api/chat"
       const body = isImageModel
-        ? { chatId: currentChatId, prompt: text, model: chatSettings?.model }
-        : { chatId: currentChatId, text, model: chatSettings?.model }
+        ? {
+            chatId: currentChatId,
+            prompt: text,
+            model: chatSettings?.model,
+            size: chatSettings?.imageSize,
+          }
+        : {
+            chatId: currentChatId,
+            text,
+            model: chatSettings?.model,
+            systemPrompt: chatSettings?.systemPrompt,
+            temperature: chatSettings?.temperature,
+            maxOutputTokens: chatSettings?.maxOutputTokens,
+          }
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -98,6 +120,7 @@ export default function HomeClient() {
         body: JSON.stringify(body),
       })
       const data = await res.json()
+      console.log(data)
 
       if (data.message) {
         setMessages((prev) => [...prev, data.message])
@@ -127,21 +150,29 @@ export default function HomeClient() {
   const handleNewChat = useCallback(async () => {
     const created: ChatItem = await fetch("/api/chats", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: chatSettings?.defaultModel }),
     }).then((r) => r.json())
     setChats((prev) => [created, ...prev])
     setCurrentChatId(created.id)
     setMessages([])
     setResponseId(null)
     setInput("")
-  }, [setMessages, setResponseId])
+    if (chatSettings?.defaultModel) {
+      setChatSettings((prev) => ({ ...prev, model: chatSettings.defaultModel }))
+    }
+  }, [setMessages, setResponseId, chatSettings, setChatSettings])
 
   const loadMessages = useCallback(
     async (id: string) => {
       const data = await fetch(`/api/chats/${id}/messages`).then((r) => r.json())
       setMessages(data.messages ?? [])
       setResponseId(data.responseId ?? null)
+      if (data.model) {
+        setChatSettings((prev) => ({ ...prev, model: data.model as LLMID }))
+      }
     },
-    [setMessages, setResponseId],
+    [setMessages, setResponseId, setChatSettings],
   )
 
   const handleDeleteChat = useCallback(
@@ -152,6 +183,8 @@ export default function HomeClient() {
         if (filtered.length === 0) {
           const created: ChatItem = await fetch("/api/chats", {
             method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: chatSettings?.defaultModel }),
           }).then((r) => r.json())
           setChats([created])
           setCurrentChatId(created.id)
@@ -167,7 +200,7 @@ export default function HomeClient() {
         setChats(filtered)
       }
     },
-    [chats, currentChatId, loadMessages, setMessages, setResponseId],
+    [chats, currentChatId, loadMessages, setMessages, setResponseId, chatSettings],
   )
 
   const handleSelectChat = useCallback(
@@ -210,6 +243,13 @@ export default function HomeClient() {
     [setChatSettings, currentChatId],
   )
 
+  const handleSettingsChange = useCallback(
+    (patch: Partial<ChatSettings>) => {
+      setChatSettings((prev) => ({ ...prev, ...patch }))
+    },
+    [setChatSettings],
+  )
+
   const currentChat = chats.find((c) => c.id === currentChatId)
 
   return (
@@ -228,17 +268,31 @@ export default function HomeClient() {
           transition: "margin-left .22s cubic-bezier(.2,.7,.3,1)",
         }}
       >
-        <Sidebar
-          chats={chats}
-          currentChatId={currentChatId}
-          onSelectChat={handleSelectChat}
-          onNewChat={handleNewChat}
-          onDeleteChat={handleDeleteChat}
-          onTogglePin={handleTogglePin}
-          onSearch={() => {}}
-          onCloseSidebar={() => setSidebarOpen(false)}
-          user={CURRENT_USER}
-        />
+        {sidebarView === "chats" ? (
+          <Sidebar
+            chats={chats}
+            currentChatId={currentChatId}
+            onSelectChat={handleSelectChat}
+            onNewChat={handleNewChat}
+            onDeleteChat={handleDeleteChat}
+            onTogglePin={handleTogglePin}
+            onSearch={() => {}}
+            onOpenSettings={() => setSidebarView("settings")}
+            onCloseSidebar={() => setSidebarOpen(false)}
+            user={CURRENT_USER}
+          />
+        ) : (
+          chatSettings && (
+            <SettingsPanel
+              settings={chatSettings}
+              onChange={handleSettingsChange}
+              theme={theme}
+              onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+              models={LLM_LIST}
+              onClose={() => setSidebarView("chats")}
+            />
+          )
+        )}
       </div>
 
       <main
