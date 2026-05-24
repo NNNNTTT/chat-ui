@@ -10,18 +10,12 @@ import { ChatMessages } from "@/components/chat/chat-messages"
 import { Composer } from "@/components/chat/composer"
 
 const CURRENT_USER = {
-  name: "田中 玲奈",
+  name: "坪田 直樹",
   initials: "T",
 }
 
-const INITIAL_CHATS: ChatItem[] = [
-  { id: "c1", title: "新しいチャット", bucket: "today", updatedAt: "たった今" },
-]
-
 const nowTime = () =>
   new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
-
-const uid = () => "c-" + Math.random().toString(36).slice(2, 9)
 
 export default function HomeClient() {
   const {
@@ -35,8 +29,8 @@ export default function HomeClient() {
     setResponseId,
   } = useContext(ChatUIContext)
 
-  const [chats, setChats] = useState<ChatItem[]>(INITIAL_CHATS)
-  const [currentChatId, setCurrentChatId] = useState(INITIAL_CHATS[0].id)
+  const [chats, setChats] = useState<ChatItem[]>([])
+  const [currentChatId, setCurrentChatId] = useState<string>("")
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [input, setInput] = useState("")
@@ -45,29 +39,39 @@ export default function HomeClient() {
     document.documentElement.classList.toggle("dark", theme === "dark")
   }, [theme])
 
-  // First user message becomes the chat title
+  // Initial load: fetch chats, create first one if empty, load its messages
   useEffect(() => {
-    const first = messages.find((m) => m.role === "user")
-    if (!first) return
-    setChats((prev) =>
-      prev.map((c) =>
-        c.id === currentChatId
-          ? {
-              ...c,
-              title:
-                first.content.length > 28
-                  ? first.content.slice(0, 26) + "…"
-                  : first.content || c.title,
-              updatedAt: "たった今",
-            }
-          : c,
-      ),
-    )
-  }, [messages, currentChatId])
+    let cancelled = false
+    ;(async () => {
+      const list: ChatItem[] = await fetch("/api/chats").then((r) => r.json())
+      if (cancelled) return
+      let initialChats = list
+      if (initialChats.length === 0) {
+        const created = await fetch("/api/chats", { method: "POST" }).then((r) =>
+          r.json(),
+        )
+        initialChats = [created]
+      }
+      if (cancelled) return
+      setChats(initialChats)
+      const first = initialChats[0]
+      setCurrentChatId(first.id)
+      const data = await fetch(`/api/chats/${first.id}/messages`).then((r) =>
+        r.json(),
+      )
+      if (cancelled) return
+      setMessages(data.messages ?? [])
+      setResponseId(data.responseId ?? null)
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
-    if (!text || isLoading) return
+    if (!text || isLoading || !currentChatId) return
 
     const userMessage: Message = {
       id: Date.now(),
@@ -83,111 +87,130 @@ export default function HomeClient() {
     const isImageModel = selectedModel?.imageOutput === true
 
     try {
-      if (isImageModel) {
-        const res = await fetch("/api/image", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: text, model: chatSettings?.model }),
+      const endpoint = isImageModel ? "/api/image" : "/api/chat"
+      const body = isImageModel
+        ? { chatId: currentChatId, prompt: text, model: chatSettings?.model }
+        : { chatId: currentChatId, text, model: chatSettings?.model }
+
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+
+      if (data.message) {
+        setMessages((prev) => [...prev, data.message])
+      }
+      if ("responseId" in data) {
+        setResponseId(data.responseId ?? null)
+      }
+      if (data.chat) {
+        setChats((prev) => {
+          const without = prev.filter((c) => c.id !== data.chat.id)
+          return [data.chat, ...without]
         })
-        const data = await res.json()
-        const assistantMessage: Message = {
-          id: Date.now() + 1,
-          role: "assistant",
-          content: data.error ?? "",
-          imageUrl: data.imageUrl,
-          time: nowTime(),
-        }
-        setMessages((prev) => [...prev, assistantMessage])
-      } else {
-        const currentMessages = [...messages, userMessage]
-        const hasImage = currentMessages.some((m) => m.imageUrl)
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: text,
-            model: chatSettings?.model,
-            ...(hasImage
-              ? { messages: currentMessages }
-              : { previousResponseId: responseId }),
-          }),
-        })
-        const data = await res.json()
-        const replyText = data.output
-          ?.find((o: { type: string }) => o.type === "message")
-          ?.content?.[0]?.text ?? ""
-        const assistantMessage: Message = {
-          id: Date.now() + 1,
-          role: "assistant",
-          content: replyText,
-          time: nowTime(),
-        }
-        setMessages((prev) => [...prev, assistantMessage])
-        if (data.id) setResponseId(data.id)
       }
     } finally {
       setIsLoading(false)
     }
-  }, [input, isLoading, chatSettings, messages, responseId, setMessages, setIsLoading, setResponseId])
+  }, [
+    input,
+    isLoading,
+    currentChatId,
+    chatSettings,
+    setMessages,
+    setIsLoading,
+    setResponseId,
+  ])
 
-  const handleNewChat = useCallback(() => {
-    const id = uid()
-    setChats((prev) => [
-      { id, title: "新しいチャット", bucket: "today", updatedAt: "たった今" },
-      ...prev,
-    ])
-    setCurrentChatId(id)
+  const handleNewChat = useCallback(async () => {
+    const created: ChatItem = await fetch("/api/chats", {
+      method: "POST",
+    }).then((r) => r.json())
+    setChats((prev) => [created, ...prev])
+    setCurrentChatId(created.id)
     setMessages([])
     setResponseId(null)
     setInput("")
   }, [setMessages, setResponseId])
 
+  const loadMessages = useCallback(
+    async (id: string) => {
+      const data = await fetch(`/api/chats/${id}/messages`).then((r) => r.json())
+      setMessages(data.messages ?? [])
+      setResponseId(data.responseId ?? null)
+    },
+    [setMessages, setResponseId],
+  )
+
   const handleDeleteChat = useCallback(
-    (id: string) => {
+    async (id: string) => {
+      await fetch(`/api/chats/${id}`, { method: "DELETE" })
       const filtered = chats.filter((c) => c.id !== id)
       if (id === currentChatId) {
         if (filtered.length === 0) {
-          const newId = uid()
-          setChats([
-            { id: newId, title: "新しいチャット", bucket: "today", updatedAt: "たった今" },
-          ])
-          setCurrentChatId(newId)
+          const created: ChatItem = await fetch("/api/chats", {
+            method: "POST",
+          }).then((r) => r.json())
+          setChats([created])
+          setCurrentChatId(created.id)
+          setMessages([])
+          setResponseId(null)
         } else {
           setChats(filtered)
-          setCurrentChatId(filtered[0].id)
+          const next = filtered[0]
+          setCurrentChatId(next.id)
+          await loadMessages(next.id)
         }
-        setMessages([])
-        setResponseId(null)
       } else {
         setChats(filtered)
       }
     },
-    [chats, currentChatId, setMessages, setResponseId],
+    [chats, currentChatId, loadMessages, setMessages, setResponseId],
   )
 
   const handleSelectChat = useCallback(
-    (id: string) => {
+    async (id: string) => {
       if (id === currentChatId) return
       setCurrentChatId(id)
-      // Single-context architecture: switching chats clears the active thread.
-      setMessages([])
-      setResponseId(null)
+      await loadMessages(id)
     },
-    [currentChatId, setMessages, setResponseId],
+    [currentChatId, loadMessages],
   )
 
-  const handleTogglePin = useCallback((id: string) => {
-    setChats((prev) => prev.map((c) => (c.id === id ? { ...c, pinned: !c.pinned } : c)))
-  }, [])
+  const handleTogglePin = useCallback(
+    async (id: string) => {
+      const current = chats.find((c) => c.id === id)
+      if (!current) return
+      const next = !current.pinned
+      setChats((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, pinned: next } : c)),
+      )
+      await fetch(`/api/chats/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pinned: next }),
+      })
+    },
+    [chats],
+  )
 
   const handleChangeModel = useCallback(
     (id: LLMID) => {
       setChatSettings((prev) => ({ ...prev, model: id }))
+      if (currentChatId) {
+        fetch(`/api/chats/${currentChatId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: id }),
+        }).catch(() => {})
+      }
     },
-    [setChatSettings],
+    [setChatSettings, currentChatId],
   )
 
-  const currentChat = chats.find((c) => c.id === currentChatId) ?? chats[0]
+  const currentChat = chats.find((c) => c.id === currentChatId)
 
   return (
     <div
