@@ -8,8 +8,15 @@ function deriveTitle(text: string): string {
 }
 
 export async function POST(req: Request) {
-  const { chatId, text, model, systemPrompt, temperature, maxOutputTokens } =
-    await req.json()
+  const {
+    chatId,
+    text,
+    model,
+    systemPrompt,
+    temperature,
+    maxOutputTokens,
+    imageUrl,
+  } = await req.json()
 
   if (typeof chatId !== "string" || typeof text !== "string") {
     return NextResponse.json(
@@ -26,15 +33,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "chat not found" }, { status: 404 })
   }
 
-  // ユーザーメッセージを保存
+  // ユーザーメッセージを保存（添付画像があれば imageUrl にセット）
   const userMessage = await prisma.message.create({
-    data: { chatId, role: "user", content: text },
+    data: {
+      chatId,
+      role: "user",
+      content: text,
+      imageUrl: typeof imageUrl === "string" && imageUrl ? imageUrl : null,
+    },
   })
 
-  // 履歴に画像が含まれる場合は messages 配列で送信、それ以外は previous_response_id を使用
-  const hasImage =
-    chat.messages.some((m) => m.imageUrl) || false
   const allMessages = [...chat.messages, userMessage]
+  // 履歴 or 現在メッセージに画像が含まれる場合は messages 配列で送信、それ以外は previous_response_id を使用
+  const hasImage = allMessages.some((m) => m.imageUrl)
 
   const input = hasImage
     ? allMessages.map((m) => {

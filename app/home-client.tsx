@@ -40,6 +40,7 @@ export default function HomeClient() {
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [input, setInput] = useState("")
   const [searchOpen, setSearchOpen] = useState(false)
+  const [attachment, setAttachment] = useState<string | null>(null)
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark")
@@ -95,16 +96,19 @@ export default function HomeClient() {
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
-    if (!text || isLoading || !currentChatId) return
+    if ((!text && !attachment) || isLoading || !currentChatId) return
 
     const userMessage: Message = {
       id: Date.now(),
       role: "user",
       content: text,
+      imageUrl: attachment ?? undefined,
       time: nowTime(),
     }
     setMessages((prev) => [...prev, userMessage])
     setInput("")
+    const pendingAttachment = attachment
+    setAttachment(null)
     setIsLoading(true)
 
     const selectedModel = LLM_LIST.find((m) => m.modelId === chatSettings?.model)
@@ -118,6 +122,7 @@ export default function HomeClient() {
             prompt: text,
             model: chatSettings?.model,
             size: chatSettings?.imageSize,
+            imageUrl: pendingAttachment,
           }
         : {
             chatId: currentChatId,
@@ -126,6 +131,7 @@ export default function HomeClient() {
             systemPrompt: chatSettings?.systemPrompt,
             temperature: chatSettings?.temperature,
             maxOutputTokens: chatSettings?.maxOutputTokens,
+            imageUrl: pendingAttachment,
           }
 
       const res = await fetch(endpoint, {
@@ -153,6 +159,7 @@ export default function HomeClient() {
     }
   }, [
     input,
+    attachment,
     isLoading,
     currentChatId,
     chatSettings,
@@ -329,6 +336,9 @@ export default function HomeClient() {
           onChange={setInput}
           onSend={handleSend}
           isLoading={isLoading}
+          attachment={attachment}
+          onAttachmentChange={setAttachment}
+          maxUploadBytes={(chatSettings?.maxUploadSizeMB ?? 10) * 1024 * 1024}
         />
       </main>
 

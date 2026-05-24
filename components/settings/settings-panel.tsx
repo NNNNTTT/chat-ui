@@ -142,6 +142,30 @@ export function SettingsPanel({
             options={IMAGE_SIZES}
           />
         </Section>
+
+        <Section label="ファイルアップロード上限">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={100}
+              value={settings.maxUploadSizeMB}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(100, Number(e.target.value) || 1))
+                onChange({ maxUploadSizeMB: v })
+              }}
+              className="flex-1 text-[13px] rounded-md border px-2.5 py-1.5 outline-none transition-shadow focus:shadow-[var(--notion-shadow-sm)] focus:border-[var(--notion-border-focus)]"
+              style={{
+                background: "var(--notion-input)",
+                borderColor: "var(--notion-input-border)",
+                color: "var(--notion-text)",
+              }}
+            />
+            <span className="text-[12px]" style={{ color: "var(--notion-text-2)" }}>
+              MB
+            </span>
+          </div>
+        </Section>
       </div>
 
       {/* Footer */}

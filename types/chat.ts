@@ -9,6 +9,7 @@ export interface ChatSettings {
     temperature: number                 // 0 – 2
     maxOutputTokens: number | null      // null = 無制限
     imageSize: ImageSize
+    maxUploadSizeMB: number             // ファイルアップロード上限 (MB)
 }
 
 export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
@@ -18,4 +19,5 @@ export const DEFAULT_CHAT_SETTINGS: ChatSettings = {
     temperature: 1,
     maxOutputTokens: null,
     imageSize: "auto",
+    maxUploadSizeMB: 10,
 }
