@@ -9,6 +9,7 @@ import { ChatHeader } from "@/components/chat/chat-header"
 import { ChatMessages } from "@/components/chat/chat-messages"
 import { Composer } from "@/components/chat/composer"
 import { SettingsPanel } from "@/components/settings/settings-panel"
+import { SearchOverlay } from "@/components/chat/search-overlay"
 
 const CURRENT_USER = {
   name: "坪田 直樹",
@@ -38,10 +39,23 @@ export default function HomeClient() {
   const [sidebarView, setSidebarView] = useState<SidebarView>("chats")
   const [theme, setTheme] = useState<"light" | "dark">("light")
   const [input, setInput] = useState("")
+  const [searchOpen, setSearchOpen] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark")
   }, [theme])
+
+  // ⌘K / Ctrl+K で検索オーバーレイを開く
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
 
   // Initial load: fetch chats, create first one if empty, load its messages
   useEffect(() => {
@@ -276,7 +290,7 @@ export default function HomeClient() {
             onNewChat={handleNewChat}
             onDeleteChat={handleDeleteChat}
             onTogglePin={handleTogglePin}
-            onSearch={() => {}}
+            onSearch={() => setSearchOpen(true)}
             onOpenSettings={() => setSidebarView("settings")}
             onCloseSidebar={() => setSidebarOpen(false)}
             user={CURRENT_USER}
@@ -317,6 +331,12 @@ export default function HomeClient() {
           isLoading={isLoading}
         />
       </main>
+
+      <SearchOverlay
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        onPick={handleSelectChat}
+      />
     </div>
   )
 }
