@@ -49,15 +49,8 @@ export function ChatHeader({
 
       <div className="flex-1" />
 
-      <button
-        onClick={onToggleTheme}
-        title={theme === "dark" ? "ライトモード" : "ダークモード"}
-        className="w-7 h-7 grid place-items-center rounded hover:bg-[var(--notion-hover)]"
-        style={{ color: "var(--notion-text-2)" }}
-      >
-        <Icon name={theme === "dark" ? "sun" : "moon"} size={16} />
-      </button>
-      <button
+      <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      {/* <button
         title="共有"
         className="w-7 h-7 grid place-items-center rounded hover:bg-[var(--notion-hover)]"
         style={{ color: "var(--notion-text-2)" }}
@@ -77,7 +70,61 @@ export function ChatHeader({
         style={{ color: "var(--notion-text-2)" }}
       >
         <Icon name="more" size={16} />
-      </button>
+      </button> */}
     </header>
+  )
+}
+
+function ThemeToggle({
+  theme,
+  onToggle,
+}: {
+  theme: "light" | "dark"
+  onToggle: () => void
+}) {
+  const handle = (target: "light" | "dark") => {
+    if (target !== theme) onToggle()
+  }
+  return (
+    <div
+      role="group"
+      aria-label="テーマ切替"
+      className="relative inline-flex items-center p-0.5 rounded-full"
+      style={{ background: "var(--notion-surface-1)" }}
+    >
+      <span
+        aria-hidden
+        className="absolute top-0.5 bottom-0.5 w-7 rounded-full transition-transform"
+        style={{
+          background: "var(--notion-bg)",
+          boxShadow: "var(--notion-shadow-sm)",
+          transform: theme === "light" ? "translateX(0)" : "translateX(28px)",
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => handle("light")}
+        title="ライトモード"
+        aria-pressed={theme === "light"}
+        className="relative z-10 w-7 h-6 grid place-items-center rounded-full transition-colors"
+        style={{
+          color: theme === "light" ? "var(--notion-text)" : "var(--notion-text-3)",
+        }}
+      >
+        <Icon name="sun" size={14} />
+      </button>
+      <button
+        type="button"
+        onClick={() => handle("dark")}
+        title="ダークモード"
+        aria-pressed={theme === "dark"}
+        className="relative z-10 w-7 h-6 grid place-items-center rounded-full transition-colors"
+        style={{
+          color: theme === "dark" ? "var(--notion-text)" : "var(--notion-text-3)",
+        }}
+      >
+        <Icon name="moon" size={14} />
+      </button>
+    </div>
   )
 }
