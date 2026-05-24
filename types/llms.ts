@@ -6,6 +6,7 @@ export type OpenAILLMID =
   | "gpt-5.5" // GPT-5.5
   | "gpt-5.5-pro" // GPT-5.5 pro
   | "gpt-5.4-mini" // GPT-5.5 mini
+  | "gpt-5.4-nano" // GPT-5.4 nano
   | "gpt-5.4" // GPT-5.4
   | "gpt-image-1" // GPT Image 1
   | "gpt-image-2" // GPT Image 2

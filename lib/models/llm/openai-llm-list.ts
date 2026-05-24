@@ -9,12 +9,12 @@ const GPT5_5: LLM = {
   hostedId: "gpt-5.5",
   platformLink: OPENAI_PLATORM_LINK,
   imageInput: true,
-  pricing: {
-    currency: "USD",
-    unit: "1M tokens",
-    inputCost: 5,
-    outputCost: 15
-  }
+  // pricing: {
+  //   currency: "USD",
+  //   unit: "1M tokens",
+  //   inputCost: 5,
+  //   outputCost: 15
+  // }
 }
 
 // GPT-5.5 pro
@@ -24,12 +24,12 @@ const GPT5_5_PRO: LLM = {
   hostedId: "gpt-5.5-pro",
   platformLink: OPENAI_PLATORM_LINK,
   imageInput: true,
-  pricing: {
-    currency: "USD",
-    unit: "1M tokens",
-    inputCost: 0.15,
-    outputCost: 0.6
-  }
+  // pricing: {
+  //   currency: "USD",
+  //   unit: "1M tokens",
+  //   inputCost: 0.15,
+  //   outputCost: 0.6
+  // }
 }
 
 // GPT-5.5 mini
@@ -39,12 +39,27 @@ const GPT5_4_MINI: LLM = {
   hostedId: "gpt-5.4-mini",
   platformLink: OPENAI_PLATORM_LINK,
   imageInput: true,
-  pricing: {
-    currency: "USD",
-    unit: "1M tokens",
-    inputCost: 10,
-    outputCost: 30
-  }
+  // pricing: {
+  //   currency: "USD",
+  //   unit: "1M tokens",
+  //   inputCost: 10,
+  //   outputCost: 30
+  // }
+}
+
+// GPT-5.5 nano
+const GPT5_4_NANO: LLM = {
+  modelId: "gpt-5.4-nano",
+  modelName: "GPT-5.4-nano",
+  hostedId: "gpt-5.4-nano",
+  platformLink: OPENAI_PLATORM_LINK,
+  imageInput: true,
+  // pricing: {
+  //   currency: "USD",
+  //   unit: "1M tokens",
+  //   inputCost: 10,
+  //   outputCost: 30
+  // }
 }
 
 // GPT-5.4
@@ -53,13 +68,13 @@ const GPT5_4: LLM = {
   modelName: "GPT-5.4",
   hostedId: "gpt-5.4",
   platformLink: OPENAI_PLATORM_LINK,
-  imageInput: false,
-  pricing: {
-    currency: "USD",
-    unit: "1M tokens",
-    inputCost: 30,
-    outputCost: 60
-  }
+  imageInput: true,
+  // pricing: {
+  //   currency: "USD",
+  //   unit: "1M tokens",
+  //   inputCost: 30,
+  //   outputCost: 60
+  // }
 }
 
 // GPT Image 2
@@ -76,6 +91,7 @@ export const OPENAI_LLM_LIST: LLM[] = [
   GPT5_5,
   GPT5_5_PRO,
   GPT5_4_MINI,
+  GPT5_4_NANO,
   GPT5_4,
   GPT_IMAGE_2
 ]
